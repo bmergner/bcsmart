@@ -1,4 +1,4 @@
-﻿/**
+/**
  *
  *  File: gogoGateGarageDoordriver.groovy
  *  Platform: Hubitat
@@ -26,35 +26,38 @@
  *    Date        Who            What
  *    ----        ---            ----
  *    2019-03-11  Bob Mergner  Original Creation
+ *    2019-03-13  Bob Mergner  Cleaned up and refactored.  Added every two second polling for more reactive automation chains in rules
  *
  *
  */
 
-def version() {"v0.1.20190311"}
+def version() {"v0.1.20190313"}
 
 import hubitat.helper.InterfaceUtils
 
 metadata {
-    definition (name: "gogoGate Garage Opener", namespace: "bcsmart", author: "Bob Mergner") {
+    definition (name: "gogoGate2 Garage Controller", namespace: "bcsmart", author: "Bob Mergner") {
         capability "Initialize"
         capability "Refresh"
-		capability "Switch"
+		capability "DoorControl"
 		
-		command "DoorOpen"
-		command "DoorClose"
-		command "GetDoorStatus"
+		//command "DoorOpen"
+		//command "DoorClose"
+		//command "GetDoorStatus"
 		
-		attribute "DoorStatus", "string"
+		attribute "door", "string"
     }
 }
 
 preferences {
-    input("ip", "text", title: "IP Address", description: "IP Address", required: true)
-	input("user", "text", title: "gogoGate Garage User", description: "gogoGate Garage User", required: true)
-	input("pass", "password", title: "gogoGate Garage Password", description: "gogoGate Garage Password", required: true)
-	input("door", "text", title: "Garage Door Number", description: "Garage Door Number", required: true)
+    input("ip", "text", title: "IP Address", description: "[IP Address of your gogoGate Device]", required: true)
+	input("user", "text", title: "gogoGate Garage User", description: "[gogoGate Username (usually admin)]", required: true)
+	input("pass", "password", title: "gogoGate Garage Password", description: "[Your gogoGate user's Password]", required: true)
+	input("door", "text", title: "Garage Door Number", description: "[Enter 1, 2 or 3]", required: true)
     input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
 }
+
+
 
 def logsOff(){
     log.warn "debug logging disabled..."
@@ -62,9 +65,16 @@ def logsOff(){
 }
 
 def refresh() {
-    log.info "refresh() called"
+    //log.info "refresh() called"
 	//initialize()
 	GetDoorStatus()
+}
+
+def doorPollStatus() {
+	 for(int i = 0;i<30;i++) {
+         refresh()
+		 pauseExecution(2000)
+      }
 }
 
 def installed() {
@@ -80,7 +90,8 @@ def updated() {
     //Create a 30 minute timer for debug logging
     if (logEnable) runIn(1800,logsOff)
     
-    runEvery1Minute(refresh)
+    currentState = "99"
+	runEvery1Minute(doorPollStatus)
     refresh()
 }
 
@@ -90,7 +101,7 @@ def LogOnAndGetCookie(){
 	
 	httpPost("http://${ip}", "login=${user}&pass=${pass}&send-login=Sign+In") { resp ->
 		allcookie = resp.headers['Set-Cookie']
-		log.debug "SetCookieValue: ${allcookie}"
+		//log.debug "SetCookieValue: ${allcookie}"
 		
 		cookie = allcookie.toString().replaceAll("; path=/","").replaceAll("Set-Cookie: ","")
     }
@@ -100,6 +111,9 @@ def LogOnAndGetCookie(){
 }
 
 def GetDoorStatus() {
+	if (currentState == null) {
+		currentState = "99"
+	}
 	//def doorStatus
 	def cookie = LogOnAndGetCookie()
 	
@@ -115,26 +129,28 @@ def GetDoorStatus() {
 		   	doorStatus = doorStatus.substring(0, doorStatus.length() - 1)
 		   	int whichdoor = Integer.parseInt(door,16) - 1
 		   	status = doorStatus.split(",")[whichdoor]
-		   	log.debug "test: ${status}"
+		   	//log.debug "test: ${status}"
 		   	doorStatus = status
 		   
-			if ( status.contains("0") ) {
-				sendEvent(name: "doorStatus", value: "Closed")
-			   	sendEvent(name: "switch", value: "off")
+			if ( status.contains("0") && !currentState.contains("0") ) {
+				//sendEvent(name: "doorStatus", value: "Closed")
+			   	sendEvent(name: "door", value: "closed")
+				currentState = "0"
 		   	}
-		   	else
+		   	else if ( status.contains("2") && !currentState.contains("2") ) 
 		   	{
-			   	sendEvent(name: "doorStatus", value: "Open")
-			   	sendEvent(name: "switch", value: "on")
+			   	//sendEvent(name: "doorStatus", value: "Open")
+			   	sendEvent(name: "door", value: "open")
+				currentState = "2"
 		   	}
-			log.debug "State:  ${status}"
+			//log.debug "State:  ${status}"
 	   	}
 	
 		return cookie
 }
 
-def DoorOpen() {
-	log.info "dooropen() called"
+def open() {
+	log.info "Door ${door} received open command from Hubitat Elevation"
 	
 	//is door closed?
 	def cookie = GetDoorStatus()
@@ -144,24 +160,31 @@ def DoorOpen() {
 		{
 			toggleDoor(cookie)
 			doorStatus = "2"
+			log.info "Open command sent to Door ${door}"
 	   	}
+	else
+		{
+			log.info "Door ${door} already open"
+		}
 }
 
-def DoorClose() {
-	log.info "dooropen() called"
+def close() {
+	log.info "Door ${door} received Close command from Hubitat Elevation"
 	
 	//Then check to see if the door is open
 	def cookie = GetDoorStatus()
-	
-	log.debug "door len: ${doorStatus.length()}"
-	log.debug "door state: ${doorStatus}"
 	
 	//now see if door is closed
 	if ( doorStatus.contains("2") )
 		{
 			toggleDoor(cookie)
 	 		doorStatus = "0"
+			log.info "Close command sent to Door ${door}"
 	   	}
+	else
+		{
+			log.info "Door ${door} already closed"
+		}
 }
 
 def toggleDoor(cookie){
@@ -173,20 +196,16 @@ def toggleDoor(cookie){
                   requestContentType: "application/json; charset=UTF-8"]
 	
       	httpGet(params) { resp ->
-            log.debug resp.contentType
-            log.debug resp.status
-			log.debug resp.data}
-	
-	//sometimes it takes a bit for the door to close so check a few times so you can react with other activities ASAP
-	runIn(10, refresh)
-	runIn(15, refresh)
-	runIn(20, refresh)
-	runIn(25, refresh)
+            //log.debug resp.contentType
+            //log.debug resp.status
+			//log.debug resp.data
+		}
 }
 	
 def initialize() {
-	runEvery1Minute(refresh)
     state.version = version()
+	currentState = "99"
+	runEvery1Minute(doorPollStatus)
     log.info "initialize() called"
     
     if (!ip || !user || !pass || !door) {
