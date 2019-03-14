@@ -10,4 +10,5 @@ This driver polls the gogoGate2 at a 2 second interval, so the door's status get
 To use with rules, choose the Door category and select your Garage Door from the list.  
 
 CHANGE LIST
+
 2019.03.14:  Initial BETA Release v0.1.20190314
