@@ -28,7 +28,7 @@
  *    2019-03-11  Bob Mergner  Original Creation
  *    2019-03-13  Bob Mergner  Cleaned up and refactored.  Added every two second polling for more reactive automation chains in rules
  *    2019-03-14  Bob Mergner  More cleanup
- *    2019-03-15  Bob Mergner  Added Temperature Sensor and Battery Level from Door Sensor 
+ *    2019-03-15  Bob Mergner  Added Temperature Sensor and Battery Level from Door Sensor, added preference for temperature units
  *
  */
 
