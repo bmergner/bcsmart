@@ -12,3 +12,10 @@ To use with rules, choose the Door category and select your Garage Door from the
 CHANGE LIST
 
 2019.03.14:  Initial BETA Release v0.1.20190314
+
+2019.03.15:  Update Release v0.1.20190315
+             Added Sensor Data from Temperature Sensor and Battery Monitor.  
+             Added Additional Setting for temperature Units Preference (C or F)
+             Added json parsing of data
+             More refactoring
+             
