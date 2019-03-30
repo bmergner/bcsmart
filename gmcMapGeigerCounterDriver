@@ -48,9 +48,7 @@ def parse(String description, String jsonText) {
 	return json[description].toString()
 }
 
-def getParams(){ 
-	//return [uri:"http://www.gmcmap.com/historyData-plain.asp?Param_ID=${GeigerID}&timezone=${Timezone}",
-	//	requestContentType: "application/json; charset=UTF-8"]
+def getParams(){
 	def params = [uri: "http://www.gmcmap.com/historyData-plain.asp?Param_ID=${GeigerID}&timezone=${Timezone}",
 		requestContentType: "application/json; charset=UTF-8"]
 	}
