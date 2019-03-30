@@ -1,0 +1,78 @@
+/*
+ * gmcmap.com Geiger Counter Query
+ */
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+
+metadata {
+    definition(name: "gmcmap.com Geiger Counter", namespace: "staze", author: "Ryan Stasel", importUrl: "https://raw.githubusercontent.com/hubitat/HubitatPublic/master/examples/drivers/httpGetSwitch.groovy") {
+        capability "Sensor"
+	capability "Refresh"
+    }
+}
+
+preferences {
+    section("URIs") {
+        input "GeigerID", "text", title: "Geiger ID", required: true
+        input "Timezone", "text", title: "Timezone", required: false
+        input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+    }
+}
+
+def logsOff() {
+    log.warn "debug logging disabled..."
+    device.updateSetting("logEnable", [value: "false", type: "bool"])
+}
+
+def updated() {
+    log.info "updated..."
+    log.warn "debug logging is: ${logEnable == true}"
+    if (logEnable) runIn(1800, logsOff)
+}
+
+def parse(String description, String jsonText) {
+    //Get value for tag contained in description variable from data contained in jsonText variable
+    def json = null
+    try{
+        json = new groovy.json.JsonSlurper().parseText(jsonText)
+          
+        if(json == null){
+            log.warn "Data not parsed"
+            return
+        }
+    }  catch(e) {
+        log.error("Failed to parse json e = ${e}")
+        return
+    }
+    
+	return json[description].toString()
+}
+
+def getParams(){ 
+	//return [uri:"http://www.gmcmap.com/historyData-plain.asp?Param_ID=${GeigerID}&timezone=${Timezone}",
+	//	requestContentType: "application/json; charset=UTF-8"]
+	def params = [uri: "http://www.gmcmap.com/historyData-plain.asp?Param_ID=${GeigerID}&timezone=${Timezone}",
+		requestContentType: "application/json; charset=UTF-8"]
+	}
+
+def refresh() {
+	def responseBody
+	
+	try {
+		log.debug "Params:  ${getParams()}"
+		httpGet(getParams()) { resp -> 
+			responseBody = resp.data.toString()
+			
+			if (logEnable) {
+				log.debug "Time:  ${parse("time",responseBody)}"
+				log.debug "CPM:  ${parse("CPM",responseBody)}"
+				log.debug "ACPM:  ${parse("ACPM",responseBody)}"
+				log.debug "uSv:  ${parse("uSv",responseBody)}"
+			}
+		}
+	} 
+	catch(Exception e) {
+		log.debug "error occured calling httpget ${e}"
+	}
+	//if (logEnable) log.info responseBody
+}
